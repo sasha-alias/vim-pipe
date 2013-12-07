@@ -1,6 +1,52 @@
-nnoremap <silent> <LocalLeader>r :call VimPipe()<CR>
+nnoremap <silent> <LocalLeader>r :call VimPipeNormal()<CR>
+vnoremap <silent> <LocalLeader>e :call VimPipeVisual()<CR>
+nnoremap <silent> <LocalLeader>e :call VimPipeExec()<CR>
 
-function! VimPipe() " {
+function! s:get_visual_selection() " {
+    let [lnum1, col1] = getpos("'<")[1:2]
+    let [lnum2, col2] = getpos("'>")[1:2]
+    let lines = getline(lnum1, lnum2)
+    let lines[-1] = lines[-1][: col2 - (&selection == 'inclusive' ? 1 : 2)]
+    let lines[0] = lines[0][col1 - 1:]
+    return lines
+endfunction " }
+
+function! VimPipeNormal() " {
+    let l:content = getline(0, '$')
+    call s:VimPipe(l:content)
+endfunction " }
+
+function! VimPipeVisual() " {
+    " Run selected block
+    let l:visual_selection = s:get_visual_selection()
+    call s:VimPipe(l:visual_selection)
+endfunction " }
+
+function! VimPipeExec() " {
+    " Run current block between separators
+
+    " remember position
+    let curline     = line(".")
+    let curcol      = virtcol(".")
+
+    " get code between separators
+    let l:start = search(b:vimpipe_separator, 'bW')
+    let l:end = search(b:vimpipe_separator, 'W')
+    if l:end == 0
+        let l:end = '$'
+    endif
+    let l:content = getbufline('%', l:start, l:end)
+
+    " return to initial position
+    call cursor(curline, curcol)
+
+    " call
+    call s:VimPipe(l:content)
+
+endfunction " }
+
+function! s:VimPipe(content) " {
+
 	" Save local settings.
 	let saved_unnamed_register = @@
 	let switchbuf_before = &switchbuf
@@ -25,7 +71,7 @@ function! VimPipe() " {
 			execute "nnoremap \<buffer> \<silent> \<LocalLeader>p :bw " . vimpipe_buffer . "\<CR>"
 
 			" Split & open.
-			let split_command = "sbuffer " . vimpipe_buffer
+			let split_command = "belowright sbuffer " . vimpipe_buffer
 			if &splitright
 				let split_command = "vert " . split_command
 			endif
@@ -73,8 +119,8 @@ function! VimPipe() " {
 	if empty(l:vimpipe_command)
 		silent call append(0, ["", "# See :help vim-pipe for setup advice."])
 	else
-		let l:parent_contents = getbufline(l:parent_buffer, 0, "$")
-		call append(line('0'), l:parent_contents)
+		"let l:parent_contents = getbufline(l:parent_buffer, 0, "$")
+		call append(line('0'), a:content)
 
 		let l:start = reltime()
 		silent execute ":%!" . l:vimpipe_command
